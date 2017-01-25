@@ -35,6 +35,7 @@ func (t *Table) Append(col Column) {
 
 // Begin method initiates a DB transaction and checks if table (Name) exists in the DB. If it does, then it calls updateTable(). If it doesn't, it calls createTable(), and then updateTable()"""
 func (t *Table) Begin() {
+	log.Infoln("Operating on table --> ", t.Name)
 	// Create the schema here
 	schemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", t.DefaultSchema)
 	_, err := t.Tx.Exec(schemaStatement)
@@ -50,9 +51,9 @@ func (t *Table) Begin() {
 	}
 	// Loop over all the available columns and call updateTable() on each column
 	for _, col := range t.Columns {
-		log.Infoln("-----------------------------------------------")
+		log.Debugln("-----------------------------------------------")
 		t.updateTable(col)
-		log.Infoln("-----------------------------------------------")
+		log.Debugln("-----------------------------------------------")
 	}
 	if t.Autocommit {
 		commitErr := t.Tx.Commit()
@@ -72,7 +73,7 @@ func (t *Table) checkTableExistence() bool {
 		t.Tx.Rollback()
 		log.Warningln("While querying for table existence, error is --> ", err)
 	}
-	log.Infoln("While checking for table existence, presence is ", presence)
+	log.Debugln("While checking for table existence, presence is ", presence)
 	return presence
 }
 
@@ -91,11 +92,14 @@ func (t *Table) DropTable() {
 	presence := t.checkTableExistence()
 	if presence {
 		// Drop the table here
+		log.Infoln("Trying to drop table --> ", t.Name)
 		statement := fmt.Sprintf("DROP TABLE %s", t.Name)
 		err := t.executeSQL(statement)
 		if err != nil {
 			t.Tx.Rollback()
 			log.Warningln("While dropping table --> ", t.Name, " error is --> ", err)
+		} else {
+			log.Infoln("Successfully dropped table --> ", t.Name)
 		}
 	}
 }
@@ -106,9 +110,9 @@ func (t *Table) updateTable(col Column) {
 	maxNumberOfSteps := 7
 	columnPresence := t.checkColumnPresence(col.Name)
 	if columnPresence {
-		log.Infoln("Column --> ", col.Name, " already exists")
+		log.Debugln("Column --> ", col.Name, " already exists")
 		columnDatatypeMatch := t.checkColumnDatatype(col)
-		log.Infoln("Column --> ", col.Name, " datatype match value is --> ", columnDatatypeMatch)
+		log.Debugln("Column --> ", col.Name, " datatype match value is --> ", columnDatatypeMatch)
 		if columnDatatypeMatch {
 			// If the datatype matches, pass, and SET minNumberOfSteps = 0 and maxNumberOfSteps = 0, since there should be no further execution, as the column is in its actual state
 			minNumberOfSteps = 0
@@ -127,7 +131,7 @@ func (t *Table) updateTable(col Column) {
 		}
 	} else {
 		// Column does not exist
-		log.Infoln("Column --> ", col.Name, " does not exist")
+		log.Debugln("Column --> ", col.Name, " does not exist")
 		minNumberOfSteps = 0
 	}
 
@@ -149,7 +153,7 @@ func (t *Table) updateTable(col Column) {
 	//  it either means that the datatype doesn't support a sequence, or the sequence needs to begin at 0.
 	for step := minNumberOfSteps; step < maxNumberOfSteps; step++ {
 		statement, statementErr := col.prepareSQLStatement(step+1, t.Name)
-		log.Infoln("In steps, statement is \n", statement, " and error is ", statementErr)
+		log.Debugln("In steps, statement is \n", statement, " and error is ", statementErr)
 		if statementErr == nil {
 			err := t.executeSQL(statement)
 			if err != nil {
@@ -165,7 +169,7 @@ func (t *Table) executeSQL(sql string) error {
 	// var err error
 	if sql != "" {
 		_, err := t.Tx.Exec(sql)
-		log.Infoln("Executing Statement --> \n", sql, " and error is ", err)
+		log.Debugln("Executing Statement --> \n", sql, " and error is ", err)
 		return err
 	}
 	return nil
@@ -201,7 +205,7 @@ func (t *Table) checkColumnDatatype(col Column) bool {
 		log.Warningln("While querying for column data type in table --> ", t.Name, " error is --> ", err)
 	}
 
-	log.Infoln("Datatype DB is ", dbDatatype, " and Column Default is ", columnDefaultDB, " and Column Datatype is ", columnDatatype)
+	log.Debugln("Datatype DB is ", dbDatatype, " and Column Default is ", columnDefaultDB, " and Column Datatype is ", columnDatatype)
 	// Check if there are sequences here
 	if columnDefaultDB.Valid {
 		// This is a sequence
@@ -229,7 +233,7 @@ func (t *Table) checkColumnDatatype(col Column) bool {
 		}
 	}
 
-	log.Infoln("In check column datatype, the value of presence is ", presence)
+	log.Debugln("In check column datatype, the value of presence is ", presence)
 	return presence
 }
 

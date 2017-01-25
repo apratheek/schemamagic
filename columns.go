@@ -15,7 +15,7 @@ type Column struct {
 	DefaultValue    string
 	IsUnique        bool
 	IsPrimary       bool
-	IsNotNull   bool
+	IsNotNull       bool
 	Comment         string
 	SequenceRestart int64
 }
@@ -56,7 +56,7 @@ func NewColumn(c Column) Column {
 
 // prepareSQLStatement prepares and returns the statement that needs to be executed by the table
 func (c *Column) prepareSQLStatement(step int, tableName string) (string, error) {
-	log.Infoln("Executing ", c.Name, " with step --> ", step)
+	log.Debugln("Executing ", c.Name, " with step --> ", step)
 	var statement string
 	if step == 1 {
 		// This is the step where the column is added without a default value
@@ -109,6 +109,6 @@ func (c *Column) prepareSQLStatement(step int, tableName string) (string, error)
 		statement = fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s", tableName, c.Name, c.Datatype, c.Name, c.Datatype)
 	}
 
-	log.Infoln("In prepareSQLStatement, statement is \n", statement)
+	log.Debugln("In prepareSQLStatement, statement is \n", statement)
 	return statement, nil
 }

@@ -16,6 +16,7 @@ func init() {
 
 // SetupDB establishes the connection between the postgres server
 func SetupDB(dbHost string, port uint16, database string, username string, password string) (*pgx.ConnPool, error) {
+	log.Infoln("Establishing connection with the database...")
 	dbConn, dbErr := pgx.NewConnPool(pgx.ConnPoolConfig{
 		ConnConfig: pgx.ConnConfig{
 			Host:     dbHost,
@@ -26,5 +27,21 @@ func SetupDB(dbHost string, port uint16, database string, username string, passw
 		},
 		MaxConnections: 10,
 	})
+	if dbErr == nil {
+		log.Infoln("Successfully connected to the database...")
+	}
 	return dbConn, dbErr
+}
+
+// SetLogLevel sets the log level of the output log
+func SetLogLevel(level string) {
+	log.Infoln("Firing up...")
+	log.Infoln("Setting log to ", level)
+	if level == "info" {
+		logger.SetLevel(logger.InfoLevel)
+	} else if level == "warn" {
+		logger.SetLevel(logger.WarnLevel)
+	} else if level == "debug" {
+		logger.SetLevel(logger.DebugLevel)
+	}
 }

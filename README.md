@@ -16,9 +16,16 @@ import "github.com/apratheek/schemamagic"
 The above command should import the package into your code, assuming that your `$GOPATH` is set. To connect to the database, the following function needs to be called.
 
 ```
-schemamagic.SetupDB(host, port, database, username, password)
+schemamagic.SetupDB(host string, port uint16, database string, username string, password string)
 ```
 which returns a connection to the underlying database and an error. `schemamagic` uses [pgx](https://github.com/jackc/pgx) as the PostgreSQL driver, so all the methods available on [*pgx.ConnPool](https://godoc.org/github.com/jackc/pgx#ConnPool) are valid on this connection.
+
+## Logging
+The package uses [logrus](https://github.com/sirupsen/logrus) to log the output. The default log is set at InfoLevel. To set it to either *warn* or *debug* or *info*, the following API is provided.
+```
+schemamagic.SetLogLevel(level string)
+```
+where `level` is either `warn`, `info` or `debug`.
 
 ## Table (struct)
 ```
