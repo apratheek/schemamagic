@@ -205,7 +205,7 @@ func (t *Table) checkColumnDatatype(col Column) bool {
 		log.Warningln("While querying for column data type in table --> ", t.Name, " error is --> ", err)
 	}
 
-	log.Debugln("Datatype DB is ", dbDatatype, " and Column Default is ", columnDefaultDB, " and Column Datatype is ", columnDatatype)
+	log.Debugln("Datatype DB is ", dbDatatype, " and ColumnDefaultDB is ", columnDefaultDB, " and ColumnDefault is ", columnDefault, " and Column Datatype is ", columnDatatype)
 	// Check if there are sequences here
 	if columnDefaultDB.Valid {
 		// This is a sequence
@@ -213,12 +213,10 @@ func (t *Table) checkColumnDatatype(col Column) bool {
 			presence = true
 		} else if columnDatatype == "serial" && dbDatatype == "integer" {
 			presence = true
+		} else if columnDefaultDB.String == columnDefault {
+			presence = true
 		} else if columnDatatype == dbDatatype {
-			if columnDefaultDB.String == columnDefault {
-				presence = true
-			} else {
-				presence = false
-			}
+			presence = true
 			// presence = true
 		} else {
 			presence = false
