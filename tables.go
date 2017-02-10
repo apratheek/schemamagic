@@ -3,6 +3,8 @@ package schemamagic
 import (
 	"fmt"
 
+	"strings"
+
 	"gopkg.in/jackc/pgx.v2"
 )
 
@@ -218,6 +220,13 @@ func (t *Table) checkColumnDatatype(col Column) bool {
 		} else if columnDatatype == dbDatatype {
 			presence = true
 			// presence = true
+		} else if dbDatatype == "ARRAY" {
+			// This is the case when the datatype is an array
+			joinedDatatype := strings.Join([]string{columnDefault, columnDatatype}, "::")
+			log.Debugln("Datatype is ARRAY, and join is ", joinedDatatype)
+			if columnDefaultDB.String == joinedDatatype {
+				presence = true
+			}
 		} else {
 			presence = false
 		}
