@@ -61,7 +61,7 @@ type Column struct {
 	Datatype        string // Datatype of the column (bigint, bigserial, text, jsonb, bigint[], etc)
 	Action          string // Default is "Add", does not support anything else as of this moment
 	DefaultExists   bool // Default is false. Stores if a default value needs to be assigned to this column
-    DefaultValue    string // This is the default value that will be set to the column if DefaultExists is true. Eg.: 400 (integer/bigint), 'Hello' (text), array[]::bigint[] (bigint[]), date_part('epoch'::text, now())::bigint (timestamp)
+        DefaultValue    string // This is the default value that will be set to the column if DefaultExists is true. Eg.: 400 (integer/bigint), 'Hello' (text), array[]::bigint[] (bigint[]), date_part('epoch'::text, now())::bigint (timestamp)
 	IsUnique        bool // Default is false. If true, the unique key contraint is added
 	IsPrimary       bool // Default is false. If true, the primary key constraint is added
 	IsNotNull   bool // Default is false. If true, the 'NOT NULL' constraint is added
