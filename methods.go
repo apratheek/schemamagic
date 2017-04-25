@@ -1,17 +1,16 @@
 package schemamagic
 
 import (
-	logger "github.com/Sirupsen/logrus"
+	logger "github.com/Unaxiom/ulogger"
 	"gopkg.in/jackc/pgx.v2"
 )
 
-var log *logger.Entry
+var log *logger.Logger
 
 func init() {
-	logger.SetLevel(logger.InfoLevel)
-	log = logger.WithFields(logger.Fields{
-	// "time": time.Now().Format("Mon Jan _2 15:04:05 2006"),
-	})
+	// logger.SetLevel(logger.InfoLevel)
+	log = logger.New()
+	log.SetLogLevel("info")
 }
 
 // SetupDB establishes the connection between the postgres server
@@ -38,10 +37,10 @@ func SetLogLevel(level string) {
 	log.Infoln("Firing up...")
 	log.Infoln("Setting log to ", level)
 	if level == "info" {
-		logger.SetLevel(logger.InfoLevel)
+		log.SetLogLevel("info")
 	} else if level == "warn" {
-		logger.SetLevel(logger.WarnLevel)
+		log.SetLogLevel("warning")
 	} else if level == "debug" {
-		logger.SetLevel(logger.DebugLevel)
+		log.SetLogLevel("debug")
 	}
 }
