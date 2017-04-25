@@ -21,7 +21,7 @@ schemamagic.SetupDB(host string, port uint16, database string, username string, 
 which returns a connection to the underlying database and an error. `schemamagic` uses [pgx](https://github.com/jackc/pgx) as the PostgreSQL driver, so all the methods available on [*pgx.ConnPool](https://godoc.org/github.com/jackc/pgx#ConnPool) are valid on this connection.
 
 ## Logging
-The package uses [logrus](https://github.com/sirupsen/logrus) to log the output. The default log is set at InfoLevel. To set it to either *warn* or *debug* or *info*, the following API is provided.
+The package uses [ulogger](https://github.com/Unaxiom/ulogger) to log the output. The default log is set at "info". To set it to either *warn* or *debug* or *info*, the following API is provided.
 ```
 schemamagic.SetLogLevel(level string)
 ```
