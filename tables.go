@@ -16,6 +16,7 @@ type Table struct {
 	Tx            *pgx.Tx
 	Autocommit    bool
 	Columns       []Column
+	constraints   []Constraint
 }
 
 // NewTable creates and returns an instance of a postgres table
@@ -33,6 +34,11 @@ func NewTable(t Table) *Table {
 // Append method accepts a column and appends it to the list of columns of the table
 func (t *Table) Append(col Column) {
 	t.Columns = append(t.Columns, col)
+}
+
+// AddConstraint accepts a constraint and appends it to the list of constraints that need to be applied on the table
+func (t *Table) AddConstraint(constraint Constraint) {
+	t.constraints = append(t.constraints, constraint)
 }
 
 // Begin method initiates a DB transaction and checks if table (Name) exists in the DB. If it does, then it calls updateTable(). If it doesn't, it calls createTable(), and then updateTable()"""
@@ -57,6 +63,19 @@ func (t *Table) Begin() {
 		t.updateTable(col)
 		log.Debugln("-----------------------------------------------")
 	}
+
+	// Iterate over the available constraints and apply them
+	for _, constraint := range t.constraints {
+		// 1. drop them first
+		dropRule := constraint.createDropRule(t.Name)
+		log.Warningln("Constraint drop rule is ", dropRule)
+		t.executeSQL(dropRule)
+		// 2. add them
+		addRule := constraint.createAddRule(t.Name)
+		log.Warningln("Constraint add rule is ", addRule)
+		t.executeSQL(addRule)
+	}
+
 	if t.Autocommit {
 		commitErr := t.Tx.Commit()
 		if commitErr != nil {
