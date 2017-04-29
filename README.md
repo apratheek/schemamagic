@@ -1,5 +1,5 @@
 # schemamagic
-Go library that automatically updates PostgreSQL schema without touching existing data.
+Go library that automatically updates PostgreSQL schema without touching existing data. Find the documentation on [godoc](https://godoc.org/github.com/apratheek/schemamagic).
 
 # Motivation
 This library aims to update SQL (PostgreSQL) schema changes painlessly, bridging the gap between SQL and NoSQL. I've been using this in production in a personal project of mine, and it has made my life a million times easier. No more messy table updates or setting defaults. 
@@ -48,10 +48,13 @@ table := schemamagic.NewTable(schemamagic.Table{Name: "temp_table", DefaultSchem
 1. `Append(col Column):`
 This method appends a column to the table
 
-2. `DropTable():`
+2. `AddConstraint(constraint Constraint):`
+This method appends a constraint to the table
+
+3. `DropTable():`
 This method drops the table from the database
 
-3. `Begin():`
+4. `Begin():`
 This method creates the table (along with all the columns) if it does not exist, or updates the schema if it has changed. 
 
 ## Column (Struct)
@@ -90,11 +93,33 @@ table.Append(c5)
 table.Append(c6)
 ```
 
+### Constraint (struct)
+```
+type Constraint struct {
+	Name  string // This stores the name of the constrant
+	Value string // This stores the constrant that needs to be applied
+}
+```
+
+### Create Constraint
+```
+compositeKey := schemamagic.Constraint{
+		Name:  "new_id",
+		Value: "PRIMARY KEY (action, version_description)",
+	}
+```
+
+### Add constraints to a table
+```
+table.AddConstraint(compositeKey)
+table.AddConstraint(anotherConstraint)
+```
+
 ## Example
 Check out a minimal [example](https://github.com/apratheek/schemamagic/blob/master/example/main.go) here.
 
 ### Things not implemented
-1. Haven't yet implemented addition of foreign keys. This wasn't something I required.
+1. ~~Haven't yet implemented addition of foreign keys. This wasn't something I required.~~ This has now been implemented via constraints.
 
 ### Gotchas
 1. If a column has `DefaultExists` set to `true` and a corresponding `DefaultValue`, and its `DefaultValue` is changed at the next iteration, then all the columns in the table are updated with the new `DefaultValue`. This was deliberate, as in case you want to update the default value, you'd probably want to update the value in all the columns.
