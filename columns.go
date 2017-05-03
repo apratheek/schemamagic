@@ -10,6 +10,7 @@ import (
 type Column struct {
 	Name            string
 	Datatype        string
+	PseudoDatatype  string // This is the name of the datatype that is used by PostgreSQL to store the mentioned Datatype. Eg.: time --> time without/with time zone, timestamp --> timestamp with/without time zone, etc.
 	Action          string
 	DefaultExists   bool
 	DefaultValue    string
@@ -26,6 +27,7 @@ func NewColumn(c Column) Column {
 	var col Column
 	col.Name = c.Name
 	col.Datatype = c.Datatype
+	col.PseudoDatatype = c.PseudoDatatype
 	if c.Action == "" {
 		col.Action = "Add"
 	} else {

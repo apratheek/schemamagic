@@ -62,6 +62,7 @@ This method creates the table (along with all the columns) if it does not exist,
 type Column struct {
 	Name            string // Name of the column
 	Datatype        string // Datatype of the column (bigint, bigserial, text, jsonb, bigint[], etc)
+	PseudoDatatype  string // This is the name of the datatype that is used by PostgreSQL to store the mentioned Datatype. Eg.: time --> time without/with time zone, timestamp --> timestamp with/without time zone, etc.
 	Action          string // Default is "Add", does not support anything else as of this moment
 	DefaultExists   bool // Default is false. Stores if a default value needs to be assigned to this column
         DefaultValue    string // This is the default value that will be set to the column if DefaultExists is true. Eg.: 400 (integer/bigint), 'Hello' (text), array[]::bigint[] (bigint[]), date_part('epoch'::text, now())::bigint (timestamp)
@@ -81,6 +82,8 @@ c3 := schemamagic.NewColumn(schemamagic.Column{Name: "version_description", Data
 c4 := schemamagic.NewColumn(schemamagic.Column{Name: "version_new", Datatype: "bigserial"})
 c5 := schemamagic.NewColumn(schemamagic.Column{Name: "arr", Datatype: "bigint[]", DefaultExists: true, DefaultValue: "array[]::bigint[]"})
 c6 := schemamagic.NewColumn(schemamagic.Column{Name: "timestamp", Datatype: "bigint", DefaultExists: true, DefaultValue: "date_part('epoch'::text, now())::bigint", IsPrimary: true, IsUnique: true})
+c7 := schemamagic.NewColumn(schemamagic.Column{Name: "timestamp2", Datatype: "timestamp", DefaultExists: true, DefaultValue: "current_timestamp", PseudoDatatype: "timestamp without time zone"})
+
 ```
 
 ### Add columns to a table
@@ -91,6 +94,7 @@ table.Append(c3)
 table.Append(c4)
 table.Append(c5)
 table.Append(c6)
+table.Append(c7)
 ```
 
 ### Constraint (struct)

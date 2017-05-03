@@ -200,11 +200,13 @@ func (t *Table) executeSQL(sql string) error {
 func (t *Table) checkColumnPresence(columnName string) bool {
 	var presence bool
 	statement := fmt.Sprintf("SELECT EXISTS(SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%s' AND table_catalog = '%s' AND column_name = '%s')", t.Name, t.Database, columnName)
+	log.Debugln("Statement in checkColumnPresence is: \n", statement)
 	err := t.Tx.QueryRow(statement).Scan(&presence)
 	if err != nil {
 		t.Tx.Rollback()
 		log.Warningln("In checkColumnPresence, error for table --> ", t.Name, " and Column --> ", columnName, " is ", err)
 	}
+	log.Debugln("Presence is ", presence)
 	return presence
 }
 
@@ -256,6 +258,16 @@ func (t *Table) checkColumnDatatype(col Column) bool {
 			presence = true
 		} else {
 			presence = false
+		}
+	}
+
+	// Finally, check if there's a pseudo name for this column (where the specified data type might have a bigger name, as in PostgreSQL standard)
+	// Example for this: time with/without timezone --> datatype is time, but PostgreSQL returns it as time with/without time zone. This needs to be handled
+	if !presence {
+		// Run this check only if the datatypes haven't already been matched
+		log.Debugln("Performing check on pseudo datatype as well and pseudo datatype is ", col.PseudoDatatype)
+		if dbDatatype == col.PseudoDatatype {
+			presence = true
 		}
 	}
 
