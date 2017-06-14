@@ -1,6 +1,0 @@
-package: github.com/apratheek/schemamagic
-import:
-- package: github.com/Unaxiom/ulogger
-  version: ^1.1.0
-- package: gopkg.in/jackc/pgx.v2
-  version: ^2.11.0
