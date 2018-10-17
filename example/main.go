@@ -26,21 +26,27 @@ func main() {
 	tx, _ := dbConn.Begin()
 	table := schemamagic.NewTable(schemamagic.Table{Name: "temp_table", DefaultSchema: "public", Database: database, Tx: tx})
 
-	c1 := schemamagic.NewColumn(schemamagic.Column{Name: "action", Datatype: "text", IsNotNull: true, IsUnique: true})
+	c1 := schemamagic.NewColumn(schemamagic.Column{Name: "action", Datatype: "text", IsNotNull: true, IsUnique: true, IndexRequired: true})
 	c2 := schemamagic.NewColumn(schemamagic.Column{Name: "created_at", Datatype: "bigint", DefaultExists: true, DefaultValue: "400"})
 	c3 := schemamagic.NewColumn(schemamagic.Column{Name: "version_description", Datatype: "text", DefaultExists: false}) // , DefaultValue: "'Hello'"
 	c4 := schemamagic.NewColumn(schemamagic.Column{Name: "version_new", Datatype: "bigserial"})
 	c5 := schemamagic.NewColumn(schemamagic.Column{Name: "arr", Datatype: "bigint[]", DefaultExists: true, DefaultValue: "array[]::bigint[]"})
-	c6 := schemamagic.NewColumn(schemamagic.Column{Name: "timestamp", Datatype: "bigint", DefaultExists: true, DefaultValue: "date_part('epoch'::text, now())::bigint", IsUnique: true})
+	c6 := schemamagic.NewColumn(schemamagic.Column{Name: "timestamp", Datatype: "bigint", DefaultExists: true, DefaultValue: "date_part('epoch'::text, now())::bigint"})
+	c7 := schemamagic.NewColumn(schemamagic.Column{Name: "indexed_col", Datatype: "text", DefaultExists: true, DefaultValue: "''", IndexRequired: true})
+	c8 := schemamagic.NewColumn(schemamagic.Column{Name: "id", Datatype: "bigserial", IsPrimary: true, IsUnique: true})
+	c9 := schemamagic.NewColumn(schemamagic.Column{Name: "id2", Datatype: "bigserial", IsUnique: true, SequenceRestart: 2000})
 	table.Append(c1)
 	table.Append(c2)
 	table.Append(c3)
 	table.Append(c4)
 	table.Append(c5)
 	table.Append(c6)
+	table.Append(c7)
+	table.Append(c8)
+	table.Append(c9)
 	compositeKey := schemamagic.Constraint{
 		Name:  "new_id",
-		Value: "PRIMARY KEY (action, version_description)",
+		Value: "UNIQUE (action, version_description)",
 	}
 	table.AddConstraint(compositeKey)
 

@@ -68,7 +68,8 @@ type Column struct {
         DefaultValue    string // This is the default value that will be set to the column if DefaultExists is true. Eg.: 400 (integer/bigint), 'Hello' (text), array[]::bigint[] (bigint[]), date_part('epoch'::text, now())::bigint (timestamp)
 	IsUnique        bool // Default is false. If true, the unique key contraint is added
 	IsPrimary       bool // Default is false. If true, the primary key constraint is added
-	IsNotNull   bool // Default is false. If true, the 'NOT NULL' constraint is added
+	IsNotNull       bool // Default is false. If true, the 'NOT NULL' constraint is added
+	IndexRequired   bool // Default is false. If true, an index is created on this column
 	Comment         string // This is just a comment regarding this column. Does not affect the execution of the library
 	SequenceRestart int64 // In case the Datatype is either bigserial or serial, a number can be mentioned here to restart the sequence
 }
@@ -78,7 +79,7 @@ type Column struct {
 ```
 c1 := schemamagic.NewColumn(schemamagic.Column{Name: "action", Datatype: "text", IsNotNull: true, IsUnique: true})
 c2 := schemamagic.NewColumn(schemamagic.Column{Name: "created_at", Datatype: "bigint", DefaultExists: true, DefaultValue: "400"})
-c3 := schemamagic.NewColumn(schemamagic.Column{Name: "version_description", Datatype: "text", DefaultExists: true, DefaultValue: "'Hello'"})
+c3 := schemamagic.NewColumn(schemamagic.Column{Name: "version_description", Datatype: "text", DefaultExists: true, DefaultValue: "'Hello'", IndexRequired: true})
 c4 := schemamagic.NewColumn(schemamagic.Column{Name: "version_new", Datatype: "bigserial"})
 c5 := schemamagic.NewColumn(schemamagic.Column{Name: "arr", Datatype: "bigint[]", DefaultExists: true, DefaultValue: "array[]::bigint[]"})
 c6 := schemamagic.NewColumn(schemamagic.Column{Name: "timestamp", Datatype: "bigint", DefaultExists: true, DefaultValue: "date_part('epoch'::text, now())::bigint", IsPrimary: true, IsUnique: true})
