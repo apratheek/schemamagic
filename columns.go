@@ -104,7 +104,7 @@ func (c *Column) prepareSQLStatement(step int, tableName string) (string, error)
 		// This is the step where a unique constraint is added, in case the column in unique
 		if c.IsUnique {
 			// statement = "ALTER TABLE %s ADD UNIQUE (%s)"%(table_name, self.column_name)
-			constraint := Constraint{Name: fmt.Sprintf("%s_unique", c.Name), Value: fmt.Sprintf("UNIQUE (%s)", c.Name)}
+			constraint := Constraint{Name: fmt.Sprintf("%s_%s_unique", tableName, c.Name), Value: fmt.Sprintf("UNIQUE (%s)", c.Name)}
 			statement = fmt.Sprintf("%s; %s", constraint.createDropRule(tableName), constraint.createAddRule(tableName))
 			// statement = fmt.Sprintf("ALTER TABLE %s ADD UNIQUE (%s)", tableName, c.Name)
 		}
@@ -123,7 +123,7 @@ func (c *Column) prepareSQLStatement(step int, tableName string) (string, error)
 	} else if step == 8 {
 		// This is the step where the index is created on this column
 		if c.IndexRequired {
-			statement = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_index ON %s (%s)", c.Name, tableName, c.Name)
+			statement = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_%s_index ON %s (%s)", tableName, c.Name, tableName, c.Name)
 		}
 	} else if step == 101 {
 		// This is the step where the column's datatype is altered
