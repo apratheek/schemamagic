@@ -68,14 +68,14 @@ func (t *Table) Begin() {
 	for _, constraint := range t.constraints {
 		// 1. drop them first
 		dropRule := constraint.createDropRule(t.Name)
-		log.Warningln("Constraint drop rule is ", dropRule)
+		log.Debugln("Constraint drop rule is ", dropRule)
 		err := t.executeSQL(dropRule)
 		if err != nil {
 			log.Fatalln("While trying to drop constraint rule --> ", dropRule, "\n the error is ", err.Error())
 		}
 		// 2. add them
 		addRule := constraint.createAddRule(t.Name)
-		log.Warningln("Constraint add rule is ", addRule)
+		log.Debugln("Constraint add rule is ", addRule)
 		err = t.executeSQL(addRule)
 		if err != nil {
 			log.Fatalln("While trying to add constraint rule -->  ", addRule, "\n the error is ", err.Error())
