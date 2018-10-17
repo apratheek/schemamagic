@@ -17,6 +17,7 @@ type Column struct {
 	IsUnique        bool
 	IsPrimary       bool
 	IsNotNull       bool
+	IndexRequired   bool
 	Comment         string
 	SequenceRestart int64
 }
@@ -33,19 +34,36 @@ func NewColumn(c Column) Column {
 	} else {
 		col.Action = c.Action
 	}
-	col.DefaultExists = c.DefaultExists
+	if c.DefaultExists {
+		col.DefaultExists = true
+	} else {
+		col.DefaultExists = false
+	}
 	if c.DefaultValue == "" {
 		col.DefaultValue = "'NULL'"
 	} else {
 		col.DefaultValue = c.DefaultValue
 	}
-	col.IsUnique = c.IsUnique
-	col.IsPrimary = c.IsPrimary
+	if c.IsUnique {
+		col.IsUnique = true
+	} else {
+		col.IsUnique = false
+	}
+	if c.IsPrimary {
+		col.IsPrimary = true
+	} else {
+		col.IsPrimary = false
+	}
 	if c.IsNotNull {
 		// Set default IsNotNull to true
 		col.IsNotNull = true
 	} else {
 		col.IsNotNull = false
+	}
+	if c.IndexRequired {
+		col.IndexRequired = true
+	} else {
+		col.IndexRequired = false
 	}
 	col.Comment = c.Comment
 	if c.SequenceRestart == 0 {
@@ -86,7 +104,9 @@ func (c *Column) prepareSQLStatement(step int, tableName string) (string, error)
 		// This is the step where a unique constraint is added, in case the column in unique
 		if c.IsUnique {
 			// statement = "ALTER TABLE %s ADD UNIQUE (%s)"%(table_name, self.column_name)
-			statement = fmt.Sprintf("ALTER TABLE %s ADD UNIQUE (%s)", tableName, c.Name)
+			constraint := Constraint{Name: fmt.Sprintf("%s_unique", c.Name), Value: fmt.Sprintf("UNIQUE (%s)", c.Name)}
+			statement = fmt.Sprintf("%s; %s", constraint.createDropRule(tableName), constraint.createAddRule(tableName))
+			// statement = fmt.Sprintf("ALTER TABLE %s ADD UNIQUE (%s)", tableName, c.Name)
 		}
 	} else if step == 6 {
 		// This is the step where a primary key constraint is added, in case the column is a primary key
@@ -99,6 +119,11 @@ func (c *Column) prepareSQLStatement(step int, tableName string) (string, error)
 		if c.IsNotNull {
 			// statement = "ALTER TABLE %s ALTER COLUMN %s SET NOT NULL"%(table_name, self.column_name)
 			statement = fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL", tableName, c.Name)
+		}
+	} else if step == 8 {
+		// This is the step where the index is created on this column
+		if c.IndexRequired {
+			statement = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_index ON %s (%s)", c.Name, tableName, c.Name)
 		}
 	} else if step == 101 {
 		// This is the step where the column's datatype is altered

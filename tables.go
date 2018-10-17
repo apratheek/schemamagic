@@ -68,12 +68,18 @@ func (t *Table) Begin() {
 	for _, constraint := range t.constraints {
 		// 1. drop them first
 		dropRule := constraint.createDropRule(t.Name)
-		log.Warningln("Constraint drop rule is ", dropRule)
-		t.executeSQL(dropRule)
+		log.Debugln("Constraint drop rule is ", dropRule)
+		err := t.executeSQL(dropRule)
+		if err != nil {
+			log.Errorln(err)
+		}
 		// 2. add them
 		addRule := constraint.createAddRule(t.Name)
-		log.Warningln("Constraint add rule is ", addRule)
-		t.executeSQL(addRule)
+		log.Debugln("Constraint add rule is ", addRule)
+		err = t.executeSQL(addRule)
+		if err != nil {
+			log.Errorln(err)
+		}
 	}
 
 	if t.Autocommit {
@@ -127,20 +133,16 @@ func (t *Table) DropTable() {
 
 // updateTable alters the table by adding a new column to it, passed as the method parameter
 func (t *Table) updateTable(col Column) {
-	minNumberOfSteps := 0
-	maxNumberOfSteps := 7
+	var steps = make([]int, 0)
 	columnPresence := t.checkColumnPresence(col.Name)
 	if columnPresence {
 		log.Debugln("Column --> ", col.Name, " already exists")
 		columnDatatypeMatch := t.checkColumnDatatype(col)
 		log.Debugln("Column --> ", col.Name, " datatype match value is --> ", columnDatatypeMatch)
 		if columnDatatypeMatch {
-			// If the datatype matches, pass, and SET minNumberOfSteps = 0 and maxNumberOfSteps = 0, since there should be no further execution, as the column is in its actual state
-			minNumberOfSteps = 0
-			maxNumberOfSteps = 0
+			// Do nothing
 		} else {
 			// If the datatype does not match, then step=101, and set minNumberOfSteps to 1, since the step=1 has already been executed in the form of datatype modificaton
-			minNumberOfSteps = 1
 			statement, statementErr := col.prepareSQLStatement(101, t.Name)
 			if statementErr != nil {
 				err := t.executeSQL(statement)
@@ -150,10 +152,18 @@ func (t *Table) updateTable(col Column) {
 				}
 			}
 		}
+		// Run these steps to check for other updates
+		steps = []int{2, 3, 5, 7, 8}
 	} else {
 		// Column does not exist
+		// DefaultExists -> 2
+		// DefaultValue -> 3
+		// IsUnique -> 5
+		// IsPrimary -> 6
+		// IsNotNull -> 7
+		// IndexRequired -> 8
 		log.Debugln("Column --> ", col.Name, " does not exist")
-		minNumberOfSteps = 0
+		steps = []int{1, 2, 3, 4, 5, 6, 7, 8}
 	}
 
 	//  There are 4 steps involved here.
@@ -172,8 +182,9 @@ func (t *Table) updateTable(col Column) {
 	//  The fourth step is to call col.prepareSQLStatement with a step=3, which would return an SQL statement that would be used to
 	//  alter the sequence start, in case the datatype is serial/bigserial. Similar to step=2, if it returns an empty statement,
 	//  it either means that the datatype doesn't support a sequence, or the sequence needs to begin at 0.
-	for step := minNumberOfSteps; step < maxNumberOfSteps; step++ {
-		statement, statementErr := col.prepareSQLStatement(step+1, t.Name)
+	for _, step := range steps {
+		// for step := minNumberOfSteps; step < maxNumberOfSteps; step++ {
+		statement, statementErr := col.prepareSQLStatement(step, t.Name)
 		log.Debugln("In steps, statement is \n", statement, " and error is ", statementErr)
 		if statementErr == nil {
 			err := t.executeSQL(statement)
