@@ -112,6 +112,10 @@ compositeKey := schemamagic.Constraint{
 		Name:  "new_id",
 		Value: "PRIMARY KEY (action, version_description)",
 	}
+compositeKey2 := schemamagic.Constraint{
+		Name:  "uniq_version",
+		Value: "UNIQUE (created_at, version_new)",
+	}
 ```
 
 ### Add constraints to a table
