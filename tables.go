@@ -143,7 +143,7 @@ func (t *Table) updateTable(col Column) {
 			// Do nothing
 		} else {
 			// If the datatype does not match, then step=101, and set minNumberOfSteps to 1, since the step=1 has already been executed in the form of datatype modificaton
-			statement, statementErr := col.prepareSQLStatement(101, t.Name)
+			statement, statementErr := col.prepareSQLStatement(101, t.Name, columnPresence)
 			if statementErr != nil {
 				err := t.executeSQL(statement)
 				if err != nil {
@@ -184,7 +184,7 @@ func (t *Table) updateTable(col Column) {
 	//  it either means that the datatype doesn't support a sequence, or the sequence needs to begin at 0.
 	for _, step := range steps {
 		// for step := minNumberOfSteps; step < maxNumberOfSteps; step++ {
-		statement, statementErr := col.prepareSQLStatement(step, t.Name)
+		statement, statementErr := col.prepareSQLStatement(step, t.Name, columnPresence)
 		log.Debugln("In steps, statement is \n", statement, " and error is ", statementErr)
 		if statementErr == nil {
 			err := t.executeSQL(statement)

@@ -75,7 +75,7 @@ func NewColumn(c Column) Column {
 }
 
 // prepareSQLStatement prepares and returns the statement that needs to be executed by the table
-func (c *Column) prepareSQLStatement(step int, tableName string) (string, error) {
+func (c *Column) prepareSQLStatement(step int, tableName string, columnPresent bool) (string, error) {
 	log.Debugln("Executing ", c.Name, " with step --> ", step)
 	var statement string
 	if step == 1 {
@@ -91,7 +91,7 @@ func (c *Column) prepareSQLStatement(step int, tableName string) (string, error)
 	} else if step == 3 {
 		// This is the step where the default value is updated for all the existing rows
 		// statement = cursor.mogrify("UPDATE %(table)s SET %(column)s = %(value)s", {"table" : AsIs(table_name), "column" : AsIs(self.column_name), "value" : AsIs(self.default_value)})
-		if c.DefaultExists {
+		if c.DefaultExists && !columnPresent {
 			statement = fmt.Sprintf("UPDATE %s SET %s = %s", tableName, c.Name, c.DefaultValue)
 		}
 	} else if step == 4 {
