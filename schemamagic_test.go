@@ -54,6 +54,12 @@ func tableTaxParams(tx *pgx.Tx) *Table {
 	table.Append(NewColumn(Column{Name: "active", Datatype: "boolean", DefaultExists: true, DefaultValue: "true"}))
 	table.Append(NewColumn(Column{Name: "timestamp", Datatype: "bigint", DefaultExists: true, DefaultValue: "date_part('epoch'::text, now())::bigint"}))
 
+	compositeKey := Constraint{
+		Name:  "tax_rates",
+		Value: "UNIQUE (tax_rate_percentage, input_credit_percentage)",
+	}
+	table.AddConstraint(compositeKey)
+
 	return table
 }
 
@@ -92,12 +98,22 @@ func tableFormsSections(tx *pgx.Tx) *Table {
 
 }
 
-func createTables(dbConn *pgx.ConnPool, assert *require.Assertions) {
+func createTables(dbConn *pgx.ConnPool, assert *require.Assertions, autoCommit bool, iteration int) {
 	tx := fetchTx(dbConn, assert)
 	// Fetch the list of tables
 	tablesList := returnAllTables(tx)
 	for _, table := range tablesList {
+		table.Autocommit = autoCommit
+		if autoCommit {
+			table.Tx = fetchTx(dbConn, assert)
+		}
+
+		if iteration%2 == 0 {
+			table.Append(NewColumn(Column{Name: "width_range", Datatype: "text[]", DefaultExists: true, DefaultValue: "'{}'"}))
+		}
+
 		table.Begin()
+
 	}
 	assert.Nil(tx.Commit())
 }
@@ -202,11 +218,11 @@ func TestSchemamagic(t *testing.T) {
 	assert.Nil(err)
 
 	// Create these tables
-	createTables(dbConn, assert)
+	createTables(dbConn, assert, true, 1)
 	// Insert data into these tables
 	param1, section1 := insertDataIntoTables(dbConn, assert)
 	// Create these tables again
-	createTables(dbConn, assert)
+	createTables(dbConn, assert, false, 2)
 	// Fetch the previously entered data
 	param2, section2 := fetchPreviouslyEnteredData(param1.ID, section1.ID, dbConn, assert)
 	// Match that the inserted values still remain in the database

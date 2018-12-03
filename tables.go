@@ -83,11 +83,7 @@ func (t *Table) Begin() {
 	}
 
 	if t.Autocommit {
-		commitErr := t.Tx.Commit()
-		if commitErr != nil {
-			t.Tx.Rollback()
-			log.Warningln("Couldn't commit changes to the TABLE --> ", t.Name, " with error being --> ", commitErr)
-		}
+		t.commit()
 	}
 }
 
@@ -290,6 +286,6 @@ func (t *Table) commit() {
 	commitErr := t.Tx.Commit()
 	if commitErr != nil {
 		t.Tx.Rollback()
-		log.Warningln("Couldn't commit table modifications --> error is ", commitErr)
+		log.Warningln("Couldn't commit changes to the TABLE --> ", t.Name, " with error being --> ", commitErr)
 	}
 }
