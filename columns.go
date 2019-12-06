@@ -8,16 +8,18 @@ import (
 
 // Column stores all the parameters of each column inside a table
 type Column struct {
-	Name            string
-	Datatype        string
-	PseudoDatatype  string // This is the name of the datatype that is used by PostgreSQL to store the mentioned Datatype. Eg.: time --> time without/with time zone, timestamp --> timestamp with/without time zone, etc.
-	Action          string
-	DefaultExists   bool
-	DefaultValue    string
-	IsUnique        bool
-	IsPrimary       bool
-	IsNotNull       bool
-	IndexRequired   bool
+	Name           string
+	Datatype       string
+	PseudoDatatype string // This is the name of the datatype that is used by PostgreSQL to store the mentioned Datatype. Eg.: time --> time without/with time zone, timestamp --> timestamp with/without time zone, etc.
+	Action         string
+	DefaultExists  bool
+	DefaultValue   string
+	IsUnique       bool
+	IsPrimary      bool
+	IsNotNull      bool
+	IndexRequired  bool
+	// Stores the Index Type: GIN, etc. Default will be empty, which is B-Tree (default index type in postgres)
+	IndexType       string
 	Comment         string
 	SequenceRestart int64
 }
@@ -64,6 +66,9 @@ func NewColumn(c Column) Column {
 		col.IndexRequired = true
 	} else {
 		col.IndexRequired = false
+	}
+	if len(c.IndexType) > 0 && c.IndexRequired {
+		col.IndexType = c.IndexType
 	}
 	col.Comment = c.Comment
 	if c.SequenceRestart == 0 {
@@ -123,7 +128,11 @@ func (c *Column) prepareSQLStatement(step int, tableName string, columnPresent b
 	} else if step == 8 {
 		// This is the step where the index is created on this column
 		if c.IndexRequired {
-			statement = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_%s_index ON %s (%s)", tableName, c.Name, tableName, c.Name)
+			if len(c.IndexType) > 0 {
+				statement = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_%s_index ON %s USING %s(%s)", tableName, c.Name, tableName, c.IndexType, c.Name)
+			} else {
+				statement = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s_%s_index ON %s (%s)", tableName, c.Name, tableName, c.Name)
+			}
 		}
 	} else if step == 101 {
 		// This is the step where the column's datatype is altered
