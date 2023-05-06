@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	logger "github.com/Unaxiom/ulogger"
 	"github.com/apratheek/schemamagic"
 )
@@ -18,12 +20,13 @@ func main() {
 	database := "play"
 	username := "username"
 	password := "password_in_string"
-	dbConn, err := schemamagic.SetupDB(host, port, database, username, password)
+	ctx := context.Background()
+	dbConn, err := schemamagic.SetupDB(ctx, host, port, database, username, password)
 
 	if err != nil {
 		log.Fatalln("Database error --> ", err)
 	}
-	tx, _ := dbConn.Begin()
+	tx, _ := dbConn.Begin(ctx)
 	table := schemamagic.NewTable(schemamagic.Table{Name: "temp_table", DefaultSchema: "public", Database: database, Tx: tx})
 
 	c1 := schemamagic.NewColumn(schemamagic.Column{Name: "action", Datatype: "text", IsNotNull: true, IsUnique: true, IndexRequired: true})
@@ -52,12 +55,12 @@ func main() {
 
 	// table.DropTable()
 	// log.Infoln("Dropping table here...")
-	table.Begin()
+	table.Begin(ctx)
 	log.Infoln("Starting table creation here...")
 
-	commitErr := tx.Commit()
+	commitErr := tx.Commit(ctx)
 	if commitErr != nil {
-		tx.Rollback()
+		tx.Rollback(ctx)
 		log.Warningln("Couldn't commit transaction --> error is ", commitErr)
 	}
 

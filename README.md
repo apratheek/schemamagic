@@ -18,7 +18,7 @@ The above command should import the package into your code, assuming that your `
 ```
 schemamagic.SetupDB(host string, port uint16, database string, username string, password string)
 ```
-which returns a connection to the underlying database and an error. `schemamagic` uses [pgx](https://github.com/jackc/pgx) as the PostgreSQL driver, so all the methods available on [*pgx.ConnPool](https://godoc.org/github.com/jackc/pgx#ConnPool) are valid on this connection.
+which returns a connection to the underlying database and an error. `schemamagic` uses [pgx](https://github.com/jackc/pgx) as the PostgreSQL driver, so all the methods available on [*pgxpool.Pool](https://godoc.org/github.com/jackc/pgx#ConnPool) are valid on this connection.
 
 ## Logging
 The package uses [ulogger](https://github.com/Unaxiom/ulogger) to log the output. The default log is set at "info". To set it to either *warn* or *debug* or *info*, the following API is provided.
@@ -33,7 +33,7 @@ type Table struct {
 	Name          string // This denotes the name of the PostgreSQL table
 	DefaultSchema string // This is the default schema (usually "public")
 	Database      string // This is the name of the database
-	Tx            *pgx.Tx // This is *pgx.Tx
+	Tx            pgx.Tx // This is pgx.Tx
 	Autocommit    bool // Denotes if the operation on each table needs to be autocommitted (default is False)
 	Columns       []Column // Stores all the columns in this table
 }
@@ -51,10 +51,10 @@ This method appends a column to the table
 2. `AddConstraint(constraint Constraint):`
 This method appends a constraint to the table
 
-3. `DropTable():`
+3. `DropTable(ctx):`
 This method drops the table from the database
 
-4. `Begin():`
+4. `Begin(ctx):`
 This method creates the table (along with all the columns) if it does not exist, or updates the schema if it has changed. 
 
 ## Column (Struct)

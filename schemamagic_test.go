@@ -1,14 +1,16 @@
 package schemamagic
 
 import (
+	"context"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 	"github.com/twinj/uuid"
-	"gopkg.in/jackc/pgx.v2"
 )
 
-func returnAllTables(tx *pgx.Tx) []*Table {
+func returnAllTables(tx pgx.Tx) []*Table {
 	tables := make([]*Table, 0)
 	tables = append(tables, tableTaxParams(tx))
 	tables = append(tables, tableFormsSections(tx))
@@ -27,7 +29,7 @@ type taxParam struct {
 	Timestamp             int64   `json:"timestamp"`
 }
 
-func tableTaxParams(tx *pgx.Tx) *Table {
+func tableTaxParams(tx pgx.Tx) *Table {
 	/*
 		CREATE TABLE tax_params (
 			id bigserial UNIQUE,
@@ -74,7 +76,7 @@ type formSection struct {
 	Timestamp   int64  `json:"timestamp"`
 }
 
-func tableFormsSections(tx *pgx.Tx) *Table {
+func tableFormsSections(tx pgx.Tx) *Table {
 	/*
 		CREATE TABLE forms_sections (
 			id bigserial UNIQUE,
@@ -98,43 +100,43 @@ func tableFormsSections(tx *pgx.Tx) *Table {
 
 }
 
-func createTables(dbConn *pgx.ConnPool, assert *require.Assertions, autoCommit bool, iteration int) {
-	tx := fetchTx(dbConn, assert)
+func createTables(ctx context.Context, dbConn *pgxpool.Pool, assert *require.Assertions, autoCommit bool, iteration int) {
+	tx := fetchTx(ctx, dbConn, assert)
 	// Fetch the list of tables
 	tablesList := returnAllTables(tx)
 	for _, table := range tablesList {
 		table.Autocommit = autoCommit
 		if autoCommit {
-			table.Tx = fetchTx(dbConn, assert)
+			table.Tx = fetchTx(ctx, dbConn, assert)
 		}
 
 		if iteration%2 == 0 {
 			table.Append(NewColumn(Column{Name: "width_range", Datatype: "text[]", DefaultExists: true, DefaultValue: "'{}'"}))
 		}
 
-		table.Begin()
+		table.Begin(ctx)
 
 	}
-	assert.Nil(tx.Commit())
+	assert.Nil(tx.Commit(ctx))
 }
 
-func deleteTables(dbConn *pgx.ConnPool, assert *require.Assertions) {
-	tx := fetchTx(dbConn, assert)
+func deleteTables(ctx context.Context, dbConn *pgxpool.Pool, assert *require.Assertions) {
+	tx := fetchTx(ctx, dbConn, assert)
 	// Fetch the list of tables
 	tablesList := returnAllTables(tx)
 	for _, table := range tablesList {
-		table.DropTable()
+		table.DropTable(ctx)
 	}
-	assert.Nil(tx.Commit())
+	assert.Nil(tx.Commit(ctx))
 }
 
-func fetchTx(dbConn *pgx.ConnPool, assert *require.Assertions) *pgx.Tx {
-	tx, err := dbConn.Begin()
+func fetchTx(ctx context.Context, dbConn *pgxpool.Pool, assert *require.Assertions) pgx.Tx {
+	tx, err := dbConn.Begin(ctx)
 	assert.Nil(err)
 	return tx
 }
 
-func insertDataIntoTables(dbConn *pgx.ConnPool, assert *require.Assertions) (taxParam, formSection) {
+func insertDataIntoTables(ctx context.Context, dbConn *pgxpool.Pool, assert *require.Assertions) (taxParam, formSection) {
 	var err error
 	param := taxParam{
 		Name:                  "Some tax " + uuid.NewV4().String(),
@@ -151,35 +153,35 @@ func insertDataIntoTables(dbConn *pgx.ConnPool, assert *require.Assertions) (tax
 		Width:       "6",
 		Active:      true,
 	}
-	tx := fetchTx(dbConn, assert)
+	tx := fetchTx(ctx, dbConn, assert)
 
-	err = tx.QueryRow(`
+	err = tx.QueryRow(ctx, `
 		INSERT INTO tax_params (name, description, tax_rate_percentage, input_credit_percentage, added_by, active)
 			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, timestamp
 	`, param.Name, param.Description, param.TaxRatePercentage, param.InputCreditPercentage, param.AddedBy, param.Active).Scan(&param.ID, &param.Timestamp)
 	assert.Nil(err)
 
-	err = tx.QueryRow(`
+	err = tx.QueryRow(ctx, `
 		INSERT INTO forms_sections (type, name, description, width, active) 
 			VALUES ($1, $2, $3, $4, $5) RETURNING id, timestamp
 	`, section.Type, section.Name, section.Description, section.Width, section.Active).Scan(&section.ID, &section.Timestamp)
 	assert.Nil(err)
 
-	assert.Nil(tx.Commit())
+	assert.Nil(tx.Commit(ctx))
 	return param, section
 }
 
-func fetchPreviouslyEnteredData(paramID int64, sectionID int64, dbConn *pgx.ConnPool, assert *require.Assertions) (taxParam, formSection) {
+func fetchPreviouslyEnteredData(ctx context.Context, paramID int64, sectionID int64, dbConn *pgxpool.Pool, assert *require.Assertions) (taxParam, formSection) {
 	var param taxParam
 	var section formSection
 	var err error
-	err = dbConn.QueryRow(`
+	err = dbConn.QueryRow(ctx, `
 		SELECT id, name, description, tax_rate_percentage, input_credit_percentage, added_by, active, timestamp
 			FROM tax_params WHERE id = $1
 	`, paramID).Scan(&param.ID, &param.Name, &param.Description, &param.TaxRatePercentage, &param.InputCreditPercentage, &param.AddedBy, &param.Active, &param.Timestamp)
 	assert.Nil(err)
 
-	err = dbConn.QueryRow(`
+	err = dbConn.QueryRow(ctx, `
 		SELECT id, type, name, description, width, active, timestamp FROM forms_sections WHERE id = $1
 	`, sectionID).Scan(&section.ID, &section.Type, &section.Name, &section.Description, &section.Width, &section.Active, &section.Timestamp)
 	assert.Nil(err)
@@ -213,21 +215,22 @@ func TestSchemamagic(t *testing.T) {
 	SetLogLevel("info")
 	SetLogLevel("warn")
 	SetLogLevel("debug")
+	ctx := context.Background()
 	// Connect to the database
-	dbConn, err := SetupDB("localhost", 5432, "schemamagic", "schemamagic", "schemamagic")
+	dbConn, err := SetupDB(ctx, "localhost", 5432, "schemamagic", "schemamagic", "schemamagic")
 	assert.Nil(err)
 
 	// Create these tables
-	createTables(dbConn, assert, true, 1)
+	createTables(ctx, dbConn, assert, true, 1)
 	// Insert data into these tables
-	param1, section1 := insertDataIntoTables(dbConn, assert)
+	param1, section1 := insertDataIntoTables(ctx, dbConn, assert)
 	// Create these tables again
-	createTables(dbConn, assert, false, 2)
+	createTables(ctx, dbConn, assert, false, 2)
 	// Fetch the previously entered data
-	param2, section2 := fetchPreviouslyEnteredData(param1.ID, section1.ID, dbConn, assert)
+	param2, section2 := fetchPreviouslyEnteredData(ctx, param1.ID, section1.ID, dbConn, assert)
 	// Match that the inserted values still remain in the database
 	assertTaxParams(param1, param2, assert)
 	assertFormSections(section1, section2, assert)
 	// Drop the tables
-	deleteTables(dbConn, assert)
+	deleteTables(ctx, dbConn, assert)
 }

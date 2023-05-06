@@ -1,11 +1,13 @@
 package schemamagic
 
 import (
+	"context"
 	"fmt"
 
 	"strings"
 
-	"gopkg.in/jackc/pgx.v2"
+	pgx "github.com/jackc/pgx/v5"
+	// pgx2 "gopkg.in/jackc/pgx.v2"
 )
 
 // Table holds the table details as well as all the columns inside the table
@@ -13,7 +15,7 @@ type Table struct {
 	Name          string
 	DefaultSchema string
 	Database      string
-	Tx            *pgx.Tx
+	Tx            pgx.Tx
 	Autocommit    bool
 	Columns       []Column
 	constraints   []Constraint
@@ -42,25 +44,25 @@ func (t *Table) AddConstraint(constraint Constraint) {
 }
 
 // Begin method initiates a DB transaction and checks if table (Name) exists in the DB. If it does, then it calls updateTable(). If it doesn't, it calls createTable(), and then updateTable()"""
-func (t *Table) Begin() {
+func (t *Table) Begin(ctx context.Context) {
 	log.Infoln("Operating on table --> ", t.Name)
 	// Create the schema here
 	schemaStatement := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", t.DefaultSchema)
-	_, err := t.Tx.Exec(schemaStatement)
+	_, err := t.Tx.Exec(ctx, schemaStatement)
 	if err != nil {
-		t.Tx.Rollback()
+		t.Tx.Rollback(ctx)
 		log.Warningln("Couldn't create schema --> ", t.DefaultSchema, " with error being --> ", err)
 	}
 	//  Check if table exists in the database
-	presence := t.checkTableExistence()
+	presence := t.checkTableExistence(ctx)
 	if !presence {
 		// Table does not exist --> need to create it
-		t.createTable()
+		t.createTable(ctx)
 	}
 	// Loop over all the available columns and call updateTable() on each column
 	for _, col := range t.Columns {
 		log.Debugln("-----------------------------------------------")
-		t.updateTable(col)
+		t.updateTable(ctx, col)
 		log.Debugln("-----------------------------------------------")
 	}
 
@@ -69,31 +71,31 @@ func (t *Table) Begin() {
 		// 1. drop them first
 		dropRule := constraint.createDropRule(t.Name)
 		log.Debugln("Constraint drop rule is ", dropRule)
-		err := t.executeSQL(dropRule)
+		err := t.executeSQL(ctx, dropRule)
 		if err != nil {
 			log.Fatalln("While trying to drop constraint rule --> ", dropRule, "\n the error is ", err.Error())
 		}
 		// 2. add them
 		addRule := constraint.createAddRule(t.Name)
 		log.Debugln("Constraint add rule is ", addRule)
-		err = t.executeSQL(addRule)
+		err = t.executeSQL(ctx, addRule)
 		if err != nil {
 			log.Fatalln("While trying to add constraint rule -->  ", addRule, "\n the error is ", err.Error())
 		}
 	}
 
 	if t.Autocommit {
-		t.commit()
+		t.commit(ctx)
 	}
 }
 
 // checkTableExistence returns if the table already exists in the DB
-func (t *Table) checkTableExistence() bool {
+func (t *Table) checkTableExistence(ctx context.Context) bool {
 	var presence bool
 	statement := fmt.Sprintf("SELECT exists(select 0 from pg_class where relname = '%s')", t.Name)
-	err := t.Tx.QueryRow(statement).Scan(&presence)
+	err := t.Tx.QueryRow(ctx, statement).Scan(&presence)
 	if err != nil {
-		t.Tx.Rollback()
+		t.Tx.Rollback(ctx)
 		log.Warningln("While querying for table existence, error is --> ", err)
 	}
 	log.Debugln("While checking for table existence, presence is ", presence)
@@ -101,25 +103,25 @@ func (t *Table) checkTableExistence() bool {
 }
 
 // createTable method creates the table in the particular DB
-func (t *Table) createTable() {
+func (t *Table) createTable(ctx context.Context) {
 	statement := fmt.Sprintf("CREATE TABLE %s()", t.Name)
-	err := t.executeSQL(statement)
+	err := t.executeSQL(ctx, statement)
 	if err != nil {
-		t.Tx.Rollback()
+		t.Tx.Rollback(ctx)
 		log.Warningln("While creating table --> ", t.Name, " error is --> ", err)
 	}
 }
 
 // DropTable method drops the table from the DB
-func (t *Table) DropTable() {
-	presence := t.checkTableExistence()
+func (t *Table) DropTable(ctx context.Context) {
+	presence := t.checkTableExistence(ctx)
 	if presence {
 		// Drop the table here
 		log.Infoln("Trying to drop table --> ", t.Name)
 		statement := fmt.Sprintf("DROP TABLE %s", t.Name)
-		err := t.executeSQL(statement)
+		err := t.executeSQL(ctx, statement)
 		if err != nil {
-			t.Tx.Rollback()
+			t.Tx.Rollback(ctx)
 			log.Warningln("While dropping table --> ", t.Name, " error is --> ", err)
 		} else {
 			log.Infoln("Successfully dropped table --> ", t.Name)
@@ -128,12 +130,12 @@ func (t *Table) DropTable() {
 }
 
 // updateTable alters the table by adding a new column to it, passed as the method parameter
-func (t *Table) updateTable(col Column) {
+func (t *Table) updateTable(ctx context.Context, col Column) {
 	var steps = make([]int, 0)
-	columnPresence := t.checkColumnPresence(col.Name)
+	columnPresence := t.checkColumnPresence(ctx, col.Name)
 	if columnPresence {
 		log.Debugln("Column --> ", col.Name, " already exists")
-		columnDatatypeMatch := t.checkColumnDatatype(col)
+		columnDatatypeMatch := t.checkColumnDatatype(ctx, col)
 		log.Debugln("Column --> ", col.Name, " datatype match value is --> ", columnDatatypeMatch)
 		if columnDatatypeMatch {
 			// Do nothing
@@ -141,9 +143,9 @@ func (t *Table) updateTable(col Column) {
 			// If the datatype does not match, then step=101, and set minNumberOfSteps to 1, since the step=1 has already been executed in the form of datatype modificaton
 			statement, statementErr := col.prepareSQLStatement(101, t.Name, columnPresence)
 			if statementErr != nil {
-				err := t.executeSQL(statement)
+				err := t.executeSQL(ctx, statement)
 				if err != nil {
-					t.Tx.Rollback()
+					t.Tx.Rollback(ctx)
 					log.Warningln("While executing SQL --> \n", statement, "\nerror is ", err)
 				}
 			}
@@ -183,9 +185,9 @@ func (t *Table) updateTable(col Column) {
 		statement, statementErr := col.prepareSQLStatement(step, t.Name, columnPresence)
 		log.Debugln("In steps, statement is \n", statement, " and error is ", statementErr)
 		if statementErr == nil {
-			err := t.executeSQL(statement)
+			err := t.executeSQL(ctx, statement)
 			if err != nil {
-				t.Tx.Rollback()
+				t.Tx.Rollback(ctx)
 				log.Warningln("Statement --> ", statement, " could not be executed because of error --> ", err)
 			}
 		}
@@ -193,10 +195,10 @@ func (t *Table) updateTable(col Column) {
 }
 
 // executeSQL executes the SQL query
-func (t *Table) executeSQL(sql string) error {
+func (t *Table) executeSQL(ctx context.Context, sql string) error {
 	// var err error
 	if sql != "" {
-		_, err := t.Tx.Exec(sql)
+		_, err := t.Tx.Exec(ctx, sql)
 		log.Debugln("Executing Statement --> \n", sql, " and error is ", err)
 		return err
 	}
@@ -204,13 +206,13 @@ func (t *Table) executeSQL(sql string) error {
 }
 
 // checkColumnPresence checks if the column name passed is present in the current table
-func (t *Table) checkColumnPresence(columnName string) bool {
+func (t *Table) checkColumnPresence(ctx context.Context, columnName string) bool {
 	var presence bool
 	statement := fmt.Sprintf("SELECT EXISTS(SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%s' AND table_catalog = '%s' AND column_name = '%s')", t.Name, t.Database, columnName)
 	log.Debugln("Statement in checkColumnPresence is: \n", statement)
-	err := t.Tx.QueryRow(statement).Scan(&presence)
+	err := t.Tx.QueryRow(ctx, statement).Scan(&presence)
 	if err != nil {
-		t.Tx.Rollback()
+		t.Tx.Rollback(ctx)
 		log.Warningln("In checkColumnPresence, error for table --> ", t.Name, " and Column --> ", columnName, " is ", err)
 	}
 	log.Debugln("Presence is ", presence)
@@ -218,32 +220,32 @@ func (t *Table) checkColumnPresence(columnName string) bool {
 }
 
 // checkColumnDatatype checks if the column datatype of the column name passed is equal to the column datatype present in the table
-func (t *Table) checkColumnDatatype(col Column) bool {
+func (t *Table) checkColumnDatatype(ctx context.Context, col Column) bool {
 	columnName := col.Name
 	columnDatatype := col.Datatype
 	columnDefault := col.DefaultValue
 	var (
 		dbDatatype      string
-		columnDefaultDB pgx.NullString
+		columnDefaultDB *string
 		presence        bool
 	)
 	statement := fmt.Sprintf("SELECT data_type, column_default FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%s' AND table_catalog = '%s' AND column_name = '%s'", t.Name, t.Database, columnName)
 
-	err := t.Tx.QueryRow(statement).Scan(&dbDatatype, &columnDefaultDB)
+	err := t.Tx.QueryRow(ctx, statement).Scan(&dbDatatype, &columnDefaultDB)
 	if err != nil {
-		t.Tx.Rollback()
+		t.Tx.Rollback(ctx)
 		log.Warningln("While querying for column data type in table --> ", t.Name, " error is --> ", err)
 	}
 
 	log.Debugln("Datatype DB is ", dbDatatype, " and ColumnDefaultDB is ", columnDefaultDB, " and ColumnDefault is ", columnDefault, " and Column Datatype is ", columnDatatype)
 	// Check if there are sequences here
-	if columnDefaultDB.Valid {
+	if true {
 		// This is a sequence
 		if columnDatatype == "bigserial" && dbDatatype == "bigint" {
 			presence = true
 		} else if columnDatatype == "serial" && dbDatatype == "integer" {
 			presence = true
-		} else if columnDefaultDB.String == columnDefault {
+		} else if columnDefaultDB == &columnDefault {
 			presence = true
 		} else if columnDatatype == dbDatatype {
 			presence = true
@@ -252,7 +254,7 @@ func (t *Table) checkColumnDatatype(col Column) bool {
 			// This is the case when the datatype is an array
 			joinedDatatype := strings.Join([]string{columnDefault, columnDatatype}, "::")
 			log.Debugln("Datatype is ARRAY, and join is ", joinedDatatype)
-			if columnDefaultDB.String == joinedDatatype {
+			if *columnDefaultDB == joinedDatatype {
 				presence = true
 			}
 		} else {
@@ -282,10 +284,10 @@ func (t *Table) checkColumnDatatype(col Column) bool {
 	return presence
 }
 
-func (t *Table) commit() {
-	commitErr := t.Tx.Commit()
+func (t *Table) commit(ctx context.Context) {
+	commitErr := t.Tx.Commit(ctx)
 	if commitErr != nil {
-		t.Tx.Rollback()
+		t.Tx.Rollback(ctx)
 		log.Warningln("Couldn't commit changes to the TABLE --> ", t.Name, " with error being --> ", commitErr)
 	}
 }
