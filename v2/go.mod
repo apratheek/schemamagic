@@ -1,4 +1,4 @@
-module github.com/apratheek/schemamagic/v2
+module github.com/apratheek/schemamagic
 
 go 1.20
 
