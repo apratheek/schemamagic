@@ -3,6 +3,7 @@ package schemamagic
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	logger "github.com/Unaxiom/ulogger"
 	"github.com/jackc/pgx/v5"
@@ -21,7 +22,7 @@ func init() {
 func SetupDB(ctx context.Context, dbHost string, port uint16, database string, username string, password string) (*pgxpool.Pool, error) {
 	log.Infoln("Establishing connection with the database...")
 	var maxConn = 40
-	var connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?pool_max_conns=%d", username, password, dbHost, port, database, maxConn)
+	var connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?pool_max_conns=%d", username, url.QueryEscape(password), dbHost, port, database, maxConn)
 	config, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
 		log.Fatalln("Couldn't parse config: ", err)
