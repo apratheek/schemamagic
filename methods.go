@@ -19,10 +19,10 @@ func init() {
 }
 
 // SetupDB establishes the connection between the postgres server
-func SetupDB(ctx context.Context, dbHost string, port uint16, database string, username string, password string) (*pgxpool.Pool, error) {
+func SetupDB(ctx context.Context, dbHost string, port uint16, database string, schema string, username string, password string) (*pgxpool.Pool, error) {
 	log.Infoln("Establishing connection with the database...")
 	var maxConn = 40
-	var connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?pool_max_conns=%d", username, url.QueryEscape(password), dbHost, port, database, maxConn)
+	var connectionString = fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?pool_max_conns=%d&search_path=%s", username, url.QueryEscape(password), dbHost, port, database, maxConn, schema)
 	config, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
 		log.Fatalln("Couldn't parse config: ", err)
