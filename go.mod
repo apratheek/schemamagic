@@ -1,6 +1,6 @@
 module github.com/apratheek/schemamagic
 
-go 1.20
+go 1.24
 
 require (
 	github.com/Unaxiom/ulogger v1.1.2
