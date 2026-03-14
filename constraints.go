@@ -11,11 +11,11 @@ type Constraint struct {
 }
 
 // createDropRule generates the SQL statement that will be used to drop this constraint
-func (c Constraint) createDropRule(tableName string) string {
-	return fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s", tableName, c.Name)
+func (c Constraint) createDropRule(tableName string, schema string) string {
+	return fmt.Sprintf("ALTER TABLE %s.%s DROP CONSTRAINT IF EXISTS %s", schema, tableName, c.Name)
 }
 
 // createAddRule generates the SQL statement that will be used to add this constraint
-func (c Constraint) createAddRule(tableName string) string {
-	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s %s", tableName, c.Name, c.Value)
+func (c Constraint) createAddRule(tableName string, schema string) string {
+	return fmt.Sprintf("ALTER TABLE %s.%s ADD CONSTRAINT %s %s", schema, tableName, c.Name, c.Value)
 }

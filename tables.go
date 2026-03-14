@@ -69,14 +69,14 @@ func (t *Table) Begin(ctx context.Context) {
 	// Iterate over the available constraints and apply them
 	for _, constraint := range t.constraints {
 		// 1. drop them first
-		dropRule := constraint.createDropRule(t.Name)
+		dropRule := constraint.createDropRule(t.Name, t.DefaultSchema)
 		log.Debugln("Constraint drop rule is ", dropRule)
 		err := t.executeSQL(ctx, dropRule)
 		if err != nil {
 			log.Fatalln("While trying to drop constraint rule --> ", dropRule, "\n the error is ", err.Error())
 		}
 		// 2. add them
-		addRule := constraint.createAddRule(t.Name)
+		addRule := constraint.createAddRule(t.Name, t.DefaultSchema)
 		log.Debugln("Constraint add rule is ", addRule)
 		err = t.executeSQL(ctx, addRule)
 		if err != nil {
@@ -92,7 +92,17 @@ func (t *Table) Begin(ctx context.Context) {
 // checkTableExistence returns if the table already exists in the DB
 func (t *Table) checkTableExistence(ctx context.Context) bool {
 	var presence bool
-	statement := fmt.Sprintf("SELECT exists(select 0 from pg_class where relname = '%s')", t.Name)
+	statement := fmt.Sprintf(`
+		SELECT EXISTS (
+			SELECT 1 
+			FROM pg_catalog.pg_class c
+			JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+			WHERE n.nspname = '%s' -- schema
+			AND c.relname = '%s'  -- table
+			AND c.relkind = 'r'                  -- 'r' = ordinary table
+		)
+	`, t.DefaultSchema, t.Name)
+
 	err := t.Tx.QueryRow(ctx, statement).Scan(&presence)
 	if err != nil {
 		t.Tx.Rollback(ctx)
@@ -104,7 +114,7 @@ func (t *Table) checkTableExistence(ctx context.Context) bool {
 
 // createTable method creates the table in the particular DB
 func (t *Table) createTable(ctx context.Context) {
-	statement := fmt.Sprintf("CREATE TABLE %s()", t.Name)
+	statement := fmt.Sprintf("CREATE TABLE %s.%s()", t.DefaultSchema, t.Name)
 	err := t.executeSQL(ctx, statement)
 	if err != nil {
 		t.Tx.Rollback(ctx)
@@ -118,7 +128,7 @@ func (t *Table) DropTable(ctx context.Context) {
 	if presence {
 		// Drop the table here
 		log.Infoln("Trying to drop table --> ", t.Name)
-		statement := fmt.Sprintf("DROP TABLE %s", t.Name)
+		statement := fmt.Sprintf("DROP TABLE %s.%s", t.DefaultSchema, t.Name)
 		err := t.executeSQL(ctx, statement)
 		if err != nil {
 			t.Tx.Rollback(ctx)
@@ -141,7 +151,7 @@ func (t *Table) updateTable(ctx context.Context, col Column) {
 			// Do nothing
 		} else {
 			// If the datatype does not match, then step=101, and set minNumberOfSteps to 1, since the step=1 has already been executed in the form of datatype modificaton
-			statement, statementErr := col.prepareSQLStatement(101, t.Name, columnPresence)
+			statement, statementErr := col.prepareSQLStatement(101, t.Name, t.DefaultSchema, columnPresence)
 			if statementErr != nil {
 				err := t.executeSQL(ctx, statement)
 				if err != nil {
@@ -182,7 +192,7 @@ func (t *Table) updateTable(ctx context.Context, col Column) {
 	//  it either means that the datatype doesn't support a sequence, or the sequence needs to begin at 0.
 	for _, step := range steps {
 		// for step := minNumberOfSteps; step < maxNumberOfSteps; step++ {
-		statement, statementErr := col.prepareSQLStatement(step, t.Name, columnPresence)
+		statement, statementErr := col.prepareSQLStatement(step, t.Name, t.DefaultSchema, columnPresence)
 		log.Debugln("In steps, statement is \n", statement, " and error is ", statementErr)
 		if statementErr == nil {
 			err := t.executeSQL(ctx, statement)
@@ -208,7 +218,7 @@ func (t *Table) executeSQL(ctx context.Context, sql string) error {
 // checkColumnPresence checks if the column name passed is present in the current table
 func (t *Table) checkColumnPresence(ctx context.Context, columnName string) bool {
 	var presence bool
-	statement := fmt.Sprintf("SELECT EXISTS(SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%s' AND table_catalog = '%s' AND column_name = '%s')", t.Name, t.Database, columnName)
+	statement := fmt.Sprintf("SELECT EXISTS(SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%s' AND table_catalog = '%s' AND column_name = '%s' AND table_schema = '%s')", t.Name, t.Database, columnName, t.DefaultSchema)
 	log.Debugln("Statement in checkColumnPresence is: \n", statement)
 	err := t.Tx.QueryRow(ctx, statement).Scan(&presence)
 	if err != nil {
@@ -229,7 +239,7 @@ func (t *Table) checkColumnDatatype(ctx context.Context, col Column) bool {
 		columnDefaultDB *string
 		presence        bool
 	)
-	statement := fmt.Sprintf("SELECT data_type, column_default FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%s' AND table_catalog = '%s' AND column_name = '%s'", t.Name, t.Database, columnName)
+	statement := fmt.Sprintf("SELECT data_type, column_default FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%s' AND table_catalog = '%s' AND column_name = '%s' AND table_schema = '%s'", t.Name, t.Database, columnName, t.DefaultSchema)
 
 	err := t.Tx.QueryRow(ctx, statement).Scan(&dbDatatype, &columnDefaultDB)
 	if err != nil {

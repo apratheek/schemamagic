@@ -10,10 +10,10 @@ import (
 	"github.com/twinj/uuid"
 )
 
-func returnAllTables(tx pgx.Tx) []*Table {
+func returnAllTables(tx pgx.Tx, schema string) []*Table {
 	tables := make([]*Table, 0)
-	tables = append(tables, tableTaxParams(tx))
-	tables = append(tables, tableFormsSections(tx))
+	tables = append(tables, tableTaxParams(tx, schema))
+	tables = append(tables, tableFormsSections(tx, schema))
 	return tables
 }
 
@@ -29,7 +29,7 @@ type taxParam struct {
 	Timestamp             int64   `json:"timestamp"`
 }
 
-func tableTaxParams(tx pgx.Tx) *Table {
+func tableTaxParams(tx pgx.Tx, schema string) *Table {
 	/*
 		CREATE TABLE tax_params (
 			id bigserial UNIQUE,
@@ -42,7 +42,7 @@ func tableTaxParams(tx pgx.Tx) *Table {
 		    timestamp bigint DEFAULT EXTRACT(EPOCH FROM NOW())::bigint -- timestamp of when this notification was generated
 		)
 	*/
-	table := NewTable(Table{Name: "tax_params", DefaultSchema: "public", Database: "schemamagic", Tx: tx})
+	table := NewTable(Table{Name: "tax_params", DefaultSchema: schema, Database: "schemamagic", Tx: tx})
 	table.Append(NewColumn(Column{Name: "id", Datatype: "bigserial", IsPrimary: true, SequenceRestart: 101}))
 	table.Append(NewColumn(Column{Name: "name", Datatype: "text", IsUnique: true}))
 	table.Append(NewColumn(Column{Name: "description", Datatype: "text", DefaultExists: true, DefaultValue: "''"}))
@@ -76,7 +76,7 @@ type formSection struct {
 	Timestamp   int64  `json:"timestamp"`
 }
 
-func tableFormsSections(tx pgx.Tx) *Table {
+func tableFormsSections(tx pgx.Tx, schema string) *Table {
 	/*
 		CREATE TABLE forms_sections (
 			id bigserial UNIQUE,
@@ -88,7 +88,7 @@ func tableFormsSections(tx pgx.Tx) *Table {
 		    timestamp bigint DEFAULT EXTRACT(EPOCH FROM NOW())::bigint -- timestamp of when this notification was generated
 		)
 	*/
-	table := NewTable(Table{Name: "forms_sections", DefaultSchema: "public", Database: "schemamagic", Tx: tx})
+	table := NewTable(Table{Name: "forms_sections", DefaultSchema: schema, Database: "schemamagic", Tx: tx})
 	table.Append(NewColumn(Column{Name: "id", Datatype: "bigserial", IsPrimary: true}))
 	table.Append(NewColumn(Column{Name: "type", Datatype: "text", IsNotNull: true, DefaultExists: true, DefaultValue: "''", IndexRequired: true}))
 	table.Append(NewColumn(Column{Name: "name", Datatype: "text", IsNotNull: true, DefaultExists: true, DefaultValue: "''"}))
@@ -100,10 +100,10 @@ func tableFormsSections(tx pgx.Tx) *Table {
 
 }
 
-func createTables(ctx context.Context, dbConn *pgxpool.Pool, assert *require.Assertions, autoCommit bool, iteration int) {
+func createTables(ctx context.Context, dbConn *pgxpool.Pool, schema string, assert *require.Assertions, autoCommit bool, iteration int) {
 	tx := fetchTx(ctx, dbConn, assert)
 	// Fetch the list of tables
-	tablesList := returnAllTables(tx)
+	tablesList := returnAllTables(tx, schema)
 	for _, table := range tablesList {
 		table.Autocommit = autoCommit
 		if autoCommit {
@@ -120,10 +120,10 @@ func createTables(ctx context.Context, dbConn *pgxpool.Pool, assert *require.Ass
 	assert.Nil(tx.Commit(ctx))
 }
 
-func deleteTables(ctx context.Context, dbConn *pgxpool.Pool, assert *require.Assertions) {
+func deleteTables(ctx context.Context, dbConn *pgxpool.Pool, schema string, assert *require.Assertions) {
 	tx := fetchTx(ctx, dbConn, assert)
 	// Fetch the list of tables
-	tablesList := returnAllTables(tx)
+	tablesList := returnAllTables(tx, schema)
 	for _, table := range tablesList {
 		table.DropTable(ctx)
 	}
@@ -217,20 +217,67 @@ func TestSchemamagic(t *testing.T) {
 	SetLogLevel("debug")
 	ctx := context.Background()
 	// Connect to the database
-	dbConn, err := SetupDB(ctx, "localhost", 5432, "schemamagic", "schemamagic", "schemamagic")
+	publicSchema := "public"
+	publicSchemaDBConn, err := SetupDB(ctx, "localhost", 5432, "schemamagic", publicSchema, "schemamagic", "schemamagic")
 	assert.Nil(err)
+	// Drop the tables
+	defer deleteTables(ctx, publicSchemaDBConn, publicSchema, assert)
 
 	// Create these tables
-	createTables(ctx, dbConn, assert, true, 1)
+	createTables(ctx, publicSchemaDBConn, publicSchema, assert, true, 1)
 	// Insert data into these tables
-	param1, section1 := insertDataIntoTables(ctx, dbConn, assert)
+	param1, section1 := insertDataIntoTables(ctx, publicSchemaDBConn, assert)
 	// Create these tables again
-	createTables(ctx, dbConn, assert, false, 2)
+	createTables(ctx, publicSchemaDBConn, publicSchema, assert, false, 2)
 	// Fetch the previously entered data
-	param2, section2 := fetchPreviouslyEnteredData(ctx, param1.ID, section1.ID, dbConn, assert)
+	param2, section2 := fetchPreviouslyEnteredData(ctx, param1.ID, section1.ID, publicSchemaDBConn, assert)
 	// Match that the inserted values still remain in the database
 	assertTaxParams(param1, param2, assert)
 	assertFormSections(section1, section2, assert)
-	// Drop the tables
-	deleteTables(ctx, dbConn, assert)
+
+	// Check if the newly entered column exists and has the default values set
+	allTables := returnAllTables(fetchTx(ctx, publicSchemaDBConn, assert), publicSchema)
+	for _, table := range allTables {
+		var widthRange []string
+		err = publicSchemaDBConn.QueryRow(ctx, `SELECT width_range FROM `+table.Name).Scan(&widthRange)
+		assert.Nil(err)
+		assert.Empty(widthRange)
+	}
+
+	// --------------------------------------------------------
+	// Create the same tables in a new schema
+	newSchema := "internal_test"
+	newSchemaDBConn, err := SetupDB(ctx, "localhost", 5432, "schemamagic", newSchema, "schemamagic", "schemamagic")
+	assert.Nil(err)
+	defer deleteTables(ctx, newSchemaDBConn, newSchema, assert)
+
+	// Create these tables
+	createTables(ctx, newSchemaDBConn, newSchema, assert, true, 1)
+	// Insert data into these tables
+	param3, section3 := insertDataIntoTables(ctx, newSchemaDBConn, assert)
+	// Create these tables again
+	createTables(ctx, newSchemaDBConn, newSchema, assert, false, 2)
+	// Fetch the previously entered data
+	param4, section4 := fetchPreviouslyEnteredData(ctx, param3.ID, section3.ID, newSchemaDBConn, assert)
+	// Match that the inserted values still remain in the database
+	assertTaxParams(param3, param4, assert)
+	assertFormSections(section3, section4, assert)
+
+	// Check if the newly entered column exists and has the default values set
+	for _, table := range allTables {
+		var widthRange []string
+		err = newSchemaDBConn.QueryRow(ctx, `SELECT width_range FROM `+table.Name).Scan(&widthRange)
+		assert.Nil(err)
+		assert.Empty(widthRange)
+	}
+	// --------------------------------------------------------
+
+	// Assert that the IDs for param1, param2, param3, param4 are the same -> since they are serial and are operating in different schemas
+	assert.Equal(param1.ID, param2.ID)
+	assert.Equal(param1.ID, param3.ID)
+	assert.Equal(param1.ID, param4.ID)
+	// Assert that the IDs for section1, section2, section3, section4 are the same
+	assert.Equal(section1.ID, section2.ID)
+	assert.Equal(section1.ID, section3.ID)
+	assert.Equal(section1.ID, section4.ID)
 }

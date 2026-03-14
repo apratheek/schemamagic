@@ -18,10 +18,11 @@ func main() {
 	host := "localhost"
 	port := uint16(5432)
 	database := "play"
+	schema := "public"
 	username := "username"
 	password := "password_in_string"
 	ctx := context.Background()
-	dbConn, err := schemamagic.SetupDB(ctx, host, port, database, username, password)
+	dbConn, err := schemamagic.SetupDB(ctx, host, port, database, schema, username, password)
 
 	if err != nil {
 		log.Fatalln("Database error --> ", err)
